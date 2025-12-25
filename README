@@ -1,6 +1,8 @@
 # Crypto ETL Backend System
 
-A production-ready ETL (Extract, Transform, Load) backend system for cryptocurrency data, ingesting from **CoinGecko** and **CoinPaprika** APIs with robust error handling, monitoring, and scalability.
+A production-ready ETL (Extract, Transform, Load) backend system for cryptocurrency data ingestion from **CoinGecko** and **CoinPaprika** APIs. Built with FastAPI, featuring robust error handling, retry mechanisms, comprehensive logging, and clean architecture principles.
+
+**Assignment Submission for Kasparov Backend & ETL Systems**
 
 ## 🏗️ Architecture
 
@@ -108,19 +110,37 @@ backend-etl-system/
 ## ⚡ Quick Start
 
 ### **Prerequisites**
-- Docker & Docker Compose installed
+- Python 3.10+ installed
+- Docker & Docker Compose installed (optional)
 - CoinPaprika API key ([Get one here](https://coinpaprika.com/api))
+- Git (for version control)
 
-### **1. Clone Repository**
+### **1. Clone or Download Repository**
 ```bash
 git clone <repository-url>
 cd backend-etl-system
 ```
 
 ### **2. Configure Environment**
+
+**Windows (PowerShell):**
+```powershell
+Copy-Item .env.example .env
+# Edit .env in VS Code or Notepad and add your COINPAPRIKA_API_KEY
+```
+
+**Linux/Mac:**
 ```bash
 cp .env.example .env
 # Edit .env and add your COINPAPRIKA_API_KEY
+```
+
+**Update `.env` file:**
+```env
+COINPAPRIKA_API_KEY=your_actual_api_key_here
+COINPAPRIKA_API_URL=https://api.coinpaprika.com/v1
+COINGECKO_API_URL=https://api.coingecko.com/api/v3
+LOG_LEVEL=INFO
 ```
 
 ### **3. Run with Docker** (Recommended)
@@ -128,29 +148,114 @@ cp .env.example .env
 docker-compose up --build
 ```
 
-### **4. Access Services**
-- API: http://localhost:8000
-- Interactive Docs: http://localhost:8000/docs
-- Health Check: http://localhost:8000/health
+### **4. Or Run Locally (Without Docker)**
+
+**Windows (PowerShell):**
+```powershell
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install package in development mode
+pip install -e .
+
+# Run the application
+uvicorn src.main:app --reload
+```
+
+**Linux/Mac:**
+```bash
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+pip install -e .
+
+# Run the application
+uvicorn src.main:app --reload
+```
+
+### **5. Access Services**
+- **API Base URL**: http://localhost:8000
+- **Interactive API Docs**: http://localhost:8000/docs ⭐ (Recommended for testing)
+- **Alternative Docs**: http://localhost:8000/redoc
+- **Health Check**: http://localhost:8000/health
 
 ## 📖 API Usage
 
-### **1. Ingest Data from CoinGecko**
+### **🌟 Recommended: Use Interactive API Docs**
+
+Open your browser and navigate to **http://localhost:8000/docs**
+
+This provides an interactive interface where you can:
+- View all available endpoints
+- Test endpoints with "Try it out" button
+- See request/response schemas
+- No command-line needed!
+
+---
+
+### **Command Line Usage**
+
+#### **Windows (PowerShell)**
+
+**1. Ingest Data from CoinGecko**
+```powershell
+Invoke-WebRequest -Uri "http://localhost:8000/api/v1/ingest/coingecko?limit=100" -Method POST -UseBasicParsing | Select-Object -Expand Content
+```
+
+**2. Ingest Data from CoinPaprika**
+```powershell
+Invoke-WebRequest -Uri "http://localhost:8000/api/v1/ingest/coinpaprika?limit=50" -Method POST -UseBasicParsing | Select-Object -Expand Content
+```
+
+**3. Ingest from Both Sources**
+```powershell
+Invoke-WebRequest -Uri "http://localhost:8000/api/v1/ingest/all" -Method POST -UseBasicParsing | Select-Object -Expand Content
+```
+
+**4. Retrieve Data with Filtering**
+```powershell
+# Get paginated data
+Invoke-WebRequest -Uri "http://localhost:8000/api/v1/data?page=1&page_size=20" -UseBasicParsing | Select-Object -Expand Content
+
+# Filter by source
+Invoke-WebRequest -Uri "http://localhost:8000/api/v1/data?source=coingecko" -UseBasicParsing | Select-Object -Expand Content
+
+# Filter by symbol
+Invoke-WebRequest -Uri "http://localhost:8000/api/v1/data?symbol=BTC" -UseBasicParsing | Select-Object -Expand Content
+```
+
+**5. Get Market Statistics**
+```powershell
+Invoke-WebRequest -Uri "http://localhost:8000/api/v1/stats" -UseBasicParsing | Select-Object -Expand Content
+```
+
+#### **Linux/Mac/Git Bash**
+
+**1. Ingest Data from CoinGecko**
 ```bash
 curl -X POST "http://localhost:8000/api/v1/ingest/coingecko?limit=100"
 ```
 
-### **2. Ingest Data from CoinPaprika**
+**2. Ingest Data from CoinPaprika**
 ```bash
 curl -X POST "http://localhost:8000/api/v1/ingest/coinpaprika?limit=50"
 ```
 
-### **3. Ingest from Both Sources**
+**3. Ingest from Both Sources**
 ```bash
 curl -X POST "http://localhost:8000/api/v1/ingest/all"
 ```
 
-### **4. Retrieve Data with Filtering**
+**4. Retrieve Data with Filtering**
 ```bash
 # Get paginated data
 curl "http://localhost:8000/api/v1/data?page=1&page_size=20"
@@ -162,7 +267,7 @@ curl "http://localhost:8000/api/v1/data?source=coingecko"
 curl "http://localhost:8000/api/v1/data?symbol=BTC"
 ```
 
-### **5. Get Market Statistics**
+**5. Get Market Statistics**
 ```bash
 curl "http://localhost:8000/api/v1/stats"
 ```
@@ -181,49 +286,128 @@ curl "http://localhost:8000/api/v1/stats"
 
 ## 🧪 Testing
 
+### **Prerequisites**
+```powershell
+# Ensure you're in the project root and virtual environment is activated
+cd C:\Users\bossu\OneDrive\Desktop\assignment\backend-etl-system
+venv\Scripts\activate
+
+# Install in development mode (first time only)
+pip install -e .
+```
+
 ### **Run All Tests**
-```bash
+```powershell
 # With Docker
 docker-compose run backend pytest
 
-# Locally
+# Locally (Windows)
 pytest -v
+
+# Or using Python module
+python -m pytest -v
 ```
 
 ### **Run with Coverage**
-```bash
+```powershell
+# Install coverage tool
+pip install pytest-cov
+
+# Run tests with coverage
+pytest --cov=src --cov-report=term-missing
+
+# Generate HTML coverage report
 pytest --cov=src --cov-report=html
+
+# Open coverage report in browser
+start htmlcov\index.html
 ```
 
-### **Test Specific Module**
-```bash
-pytest tests/test_api.py -v
+### **Run Specific Tests**
+```powershell
+# Test specific file
+pytest tests\test_api.py -v
+
+# Test specific function
+pytest tests\test_api.py::test_health_check -v
+
+# Run with more verbosity
+pytest -vv
+
+# Stop at first failure
+pytest -x
 ```
 
 ## 🔧 Development Setup
 
 ### **Local Development (Without Docker)**
 
+#### **Windows (PowerShell)**
+
 1. **Create Virtual Environment**
+```powershell
+python -m venv venv
+```
+
+2. **Activate Virtual Environment**
+```powershell
+venv\Scripts\activate
+# You should see (venv) in your terminal prompt
+```
+
+3. **Install Dependencies**
+```powershell
+pip install -r requirements.txt
+pip install -e .  # Install in development mode
+```
+
+4. **Configure Environment**
+```powershell
+# Copy template
+Copy-Item .env.example .env
+
+# Edit .env file and add your API key
+code .env  # Opens in VS Code
+# Or: notepad .env
+```
+
+5. **Run Development Server**
+```powershell
+uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+#### **Linux/Mac**
+
+1. **Create and Activate Virtual Environment**
 ```bash
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate
 ```
 
 2. **Install Dependencies**
 ```bash
 pip install -r requirements.txt
+pip install -e .
 ```
 
 3. **Set Environment Variables**
 ```bash
-export COINPAPRIKA_API_KEY="your_key_here"
+cp .env.example .env
+# Edit .env and add your COINPAPRIKA_API_KEY
 ```
 
 4. **Run Development Server**
 ```bash
 uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+### **Development Workflow**
+
+1. **Start the server** (with hot reload)
+2. **Open API docs** at http://localhost:8000/docs
+3. **Make code changes** - server will auto-reload
+4. **Run tests** after changes: `pytest -v`
+5. **Check logs** in the terminal for debugging
 
 ## 🚢 Deployment
 
@@ -320,7 +504,75 @@ The system implements robust error handling:
 | `COINGECKO_API_URL` | No | `https://api.coingecko.com/api/v3` | CoinGecko base URL |
 | `COINPAPRIKA_API_URL` | No | `https://api.coinpaprika.com/v1` | CoinPaprika base URL |
 | `LOG_LEVEL` | No | `INFO` | Logging level |
-| `MAX_RETRIES` | No | `3` | Max retry attempts |
+
+## 🔍 Troubleshooting
+
+### **Common Issues**
+
+#### **1. Module Not Found Error**
+```
+ModuleNotFoundError: No module named 'src'
+```
+**Solution:**
+```powershell
+# Make sure you're in the project root
+cd C:\Users\bossu\OneDrive\Desktop\assignment\backend-etl-system
+
+# Install in development mode
+pip install -e .
+
+# Run tests
+pytest
+```
+
+#### **2. PowerShell curl Command Not Working**
+```
+Invoke-WebRequest : A parameter cannot be found that matches parameter name 'X'.
+```
+**Solution:** Use `Invoke-WebRequest` instead of `curl`, or use the interactive docs at http://localhost:8000/docs
+
+#### **3. API Key Error**
+```
+ValidationError: COINPAPRIKA_API_KEY
+```
+**Solution:**
+- Open `.env` file
+- Replace `paste_your_actual_api_key_here` with your actual API key from coinpaprika.com
+- Restart the application
+
+#### **4. Port Already in Use**
+```
+Error: [Errno 10048] error while attempting to bind on address ('0.0.0.0', 8000)
+```
+**Solution:**
+```powershell
+# Find process using port 8000
+netstat -ano | findstr :8000
+
+# Kill the process (replace PID with actual process ID)
+taskkill /PID <PID> /F
+
+# Or use a different port
+uvicorn src.main:app --reload --port 8001
+```
+
+#### **5. Virtual Environment Not Activating**
+**Solution:**
+```powershell
+# Enable script execution (run as Administrator)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# Then activate
+venv\Scripts\activate
+```
+
+### **Getting Help**
+
+1. Check the logs in the terminal
+2. Review API documentation at http://localhost:8000/docs
+3. Verify environment variables in `.env` file
+4. Ensure all dependencies are installed: `pip list`
+5. Check Python version: `python --version` (should be 3.10+)
 
 ## 🤝 Contributing
 
@@ -334,16 +586,36 @@ The system implements robust error handling:
 
 This project is licensed under the MIT License.
 
-## 👥 Authors
+## 👥 Author
 
-- Your Name - [GitHub](https://github.com/yourusername)
+- **Student Submission** - Backend & ETL Systems Assignment
+- **Institution**: Kasparov
+- **Date**: December 25, 2025
 
 ## 🙏 Acknowledgments
 
-- CoinGecko API for free cryptocurrency data
-- CoinPaprika API for comprehensive crypto information
-- FastAPI framework for excellent developer experience
+- **CoinGecko API** - Free cryptocurrency market data
+- **CoinPaprika API** - Comprehensive crypto information
+- **FastAPI** - Modern, fast web framework for building APIs
+- **Kasparov** - Assignment specification and guidance
 
 ---
 
-**Need Help?** Open an issue or contact: your.email@example.com
+## 📞 Support
+
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+- **Project Repository**: [GitHub Link]
+
+---
+
+**Assignment Completion Checklist:**
+- ✅ P0: Dual data sources (CoinGecko + CoinPaprika)
+- ✅ P0: RESTful API with `/data` and `/health` endpoints
+- ✅ P0: Dockerized deployment
+- ✅ P0: Test suite
+- ✅ P1: `/stats` endpoint with analytics
+- ✅ P1: Clean architecture with separated concerns
+- ✅ P2: Retry logic with exponential backoff
+- ✅ P2: Comprehensive logging and observability
+- ✅ P2: Robust error handling and recovery
