@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pandas
+requests
+python-multipart
+pydantic
+pydantic-settings
+pytest
+python-dotenv

@@ -1,0 +1,349 @@
+# Crypto ETL Backend System
+
+A production-ready ETL (Extract, Transform, Load) backend system for cryptocurrency data, ingesting from **CoinGecko** and **CoinPaprika** APIs with robust error handling, monitoring, and scalability.
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     API Gateway Layer                        │
+│                  (FastAPI with CORS)                         │
+└─────────────────────────────────────────────────────────────┘
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+        ▼                   ▼                   ▼
+┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+│   Ingestion  │   │   Business   │   │   Monitoring │
+│     Layer    │   │     Logic    │   │    Layer     │
+└──────────────┘   └──────────────┘   └──────────────┘
+        │                   │                   │
+        ▼                   ▼                   ▼
+┌──────────────────────────────────────────────────────┐
+│              Data Storage Layer                       │
+│         (In-Memory / Extensible to DB)               │
+└──────────────────────────────────────────────────────┘
+        │
+        ▼
+┌──────────────────────────────────────────────────────┐
+│           External Data Sources                       │
+│   CoinGecko API  │  CoinPaprika API                  │
+└──────────────────────────────────────────────────────┘
+```
+
+## 🚀 Features
+
+### **P0 - Foundation Layer** ✅
+- ✅ **Dual Data Source Ingestion**: CoinGecko + CoinPaprika APIs
+- ✅ **RESTful API**: FastAPI with automatic OpenAPI documentation
+- ✅ **Health Monitoring**: `/health` endpoint for service status
+- ✅ **Dockerized Deployment**: One-command setup with Docker Compose
+- ✅ **Test Suite**: Unit and integration tests
+
+### **P1 - Growth Layer** ✅
+- ✅ **Statistical Analysis** (`/stats`): Market metrics, top gainers/losers
+- ✅ **Advanced Filtering**: Filter by source, symbol, pagination
+- ✅ **Clean Architecture**: Separation of concerns (data, business, API layers)
+- ✅ **Comprehensive Error Handling**: Retry logic, timeout handling
+
+### **P2 - Differentiation Layer** ✅
+- ✅ **Rate Limiting & Backoff**: Exponential backoff for API failures
+- ✅ **Observability**: Structured logging with timestamps
+- ✅ **Failure Recovery**: Graceful degradation on API failures
+- ✅ **Configuration Management**: Environment-based settings
+
+## 📁 Project Structure
+
+```
+backend-etl-system/
+├── src/
+│   ├── __init__.py
+│   ├── main.py                    # FastAPI application entry point
+│   ├── config.py                  # Configuration management
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── routes.py              # API endpoint definitions
+│   ├── ingestion/
+│   │   ├── __init__.py
+│   │   ├── base.py                # Base ingestion class
+│   │   ├── coingecko.py           # CoinGecko API integration
+│   │   └── coinpaprika.py         # CoinPaprika API integration
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── schemas.py             # Pydantic data models
+│   ├── database/
+│   │   ├── __init__.py
+│   │   └── storage.py             # Data storage abstraction
+│   └── utils/
+│       ├── __init__.py
+│       ├── logger.py              # Logging configuration
+│       └── retry.py               # Retry logic utilities
+├── tests/
+│   ├── __init__.py
+│   ├── test_api.py                # API endpoint tests
+│   ├── test_ingestion.py          # Data ingestion tests
+│   └── test_utils.py              # Utility function tests
+├── docs/
+│   ├── API.md                     # API documentation
+│   └── DEPLOYMENT.md              # Deployment guide
+├── .env.example                   # Environment template
+├── .gitignore
+├── Dockerfile                     # Container image definition
+├── docker-compose.yml             # Multi-container orchestration
+├── requirements.txt               # Python dependencies
+├── pytest.ini                     # Test configuration
+└── README.md                      # This file
+```
+
+## 🛠️ Technology Stack
+
+- **Backend Framework**: FastAPI 0.104+
+- **Data Processing**: Pandas 2.1+
+- **HTTP Client**: Requests with retry logic
+- **Validation**: Pydantic v2
+- **Testing**: Pytest
+- **Containerization**: Docker & Docker Compose
+- **Python**: 3.11+
+
+## ⚡ Quick Start
+
+### **Prerequisites**
+- Docker & Docker Compose installed
+- CoinPaprika API key ([Get one here](https://coinpaprika.com/api))
+
+### **1. Clone Repository**
+```bash
+git clone <repository-url>
+cd backend-etl-system
+```
+
+### **2. Configure Environment**
+```bash
+cp .env.example .env
+# Edit .env and add your COINPAPRIKA_API_KEY
+```
+
+### **3. Run with Docker** (Recommended)
+```bash
+docker-compose up --build
+```
+
+### **4. Access Services**
+- API: http://localhost:8000
+- Interactive Docs: http://localhost:8000/docs
+- Health Check: http://localhost:8000/health
+
+## 📖 API Usage
+
+### **1. Ingest Data from CoinGecko**
+```bash
+curl -X POST "http://localhost:8000/api/v1/ingest/coingecko?limit=100"
+```
+
+### **2. Ingest Data from CoinPaprika**
+```bash
+curl -X POST "http://localhost:8000/api/v1/ingest/coinpaprika?limit=50"
+```
+
+### **3. Ingest from Both Sources**
+```bash
+curl -X POST "http://localhost:8000/api/v1/ingest/all"
+```
+
+### **4. Retrieve Data with Filtering**
+```bash
+# Get paginated data
+curl "http://localhost:8000/api/v1/data?page=1&page_size=20"
+
+# Filter by source
+curl "http://localhost:8000/api/v1/data?source=coingecko"
+
+# Filter by symbol
+curl "http://localhost:8000/api/v1/data?symbol=BTC"
+```
+
+### **5. Get Market Statistics**
+```bash
+curl "http://localhost:8000/api/v1/stats"
+```
+
+**Response Example:**
+```json
+{
+  "total_coins": 150,
+  "total_market_cap": 2500000000000,
+  "total_volume": 150000000000,
+  "avg_price": 1250.50,
+  "top_gainers": [...],
+  "top_losers": [...]
+}
+```
+
+## 🧪 Testing
+
+### **Run All Tests**
+```bash
+# With Docker
+docker-compose run backend pytest
+
+# Locally
+pytest -v
+```
+
+### **Run with Coverage**
+```bash
+pytest --cov=src --cov-report=html
+```
+
+### **Test Specific Module**
+```bash
+pytest tests/test_api.py -v
+```
+
+## 🔧 Development Setup
+
+### **Local Development (Without Docker)**
+
+1. **Create Virtual Environment**
+```bash
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+```
+
+2. **Install Dependencies**
+```bash
+pip install -r requirements.txt
+```
+
+3. **Set Environment Variables**
+```bash
+export COINPAPRIKA_API_KEY="your_key_here"
+```
+
+4. **Run Development Server**
+```bash
+uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+## 🚢 Deployment
+
+### **Docker Hub Deployment**
+
+1. **Build Image**
+```bash
+docker build -t yourusername/crypto-etl-backend:latest .
+```
+
+2. **Push to Registry**
+```bash
+docker push yourusername/crypto-etl-backend:latest
+```
+
+3. **Pull and Run**
+```bash
+docker pull yourusername/crypto-etl-backend:latest
+docker run -p 8000:8000 --env-file .env yourusername/crypto-etl-backend:latest
+```
+
+### **Cloud Deployment**
+
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for:
+- AWS ECS deployment
+- Google Cloud Run deployment
+- Azure Container Instances deployment
+
+## 🔐 Security
+
+- ✅ API keys stored in environment variables
+- ✅ No sensitive data in version control
+- ✅ CORS middleware configured
+- ✅ Input validation with Pydantic
+- ✅ Rate limiting on external API calls
+
+## 📊 Monitoring & Observability
+
+### **Health Check**
+```bash
+curl http://localhost:8000/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "message": "Crypto ETL Backend is running",
+  "version": "1.0.0",
+  "timestamp": "2024-12-25T10:30:00Z"
+}
+```
+
+### **Logging**
+All operations are logged with:
+- Timestamp
+- Log level
+- Component name
+- Error details (if applicable)
+
+Example:
+```
+2024-12-25 10:30:15 - INFO - CoinGecko: Fetched 100 coins successfully
+2024-12-25 10:30:20 - ERROR - CoinPaprika: API request failed, retrying...
+```
+
+## 🛡️ Error Handling
+
+The system implements robust error handling:
+
+1. **Network Failures**: Automatic retry with exponential backoff
+2. **API Rate Limits**: Graceful backoff and retry
+3. **Invalid Data**: Validation errors logged, processing continues
+4. **Timeouts**: Configurable timeout with fallback
+5. **Partial Failures**: One source failure doesn't block others
+
+## 🔄 Future Enhancements
+
+- [ ] PostgreSQL integration for persistent storage
+- [ ] Redis caching layer
+- [ ] WebSocket support for real-time updates
+- [ ] Incremental data ingestion with change detection
+- [ ] GraphQL API layer
+- [ ] Prometheus metrics export
+- [ ] Kubernetes deployment manifests
+
+## 📝 Configuration
+
+### **Environment Variables**
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `COINPAPRIKA_API_KEY` | Yes | - | CoinPaprika API key |
+| `COINGECKO_API_URL` | No | `https://api.coingecko.com/api/v3` | CoinGecko base URL |
+| `COINPAPRIKA_API_URL` | No | `https://api.coinpaprika.com/v1` | CoinPaprika base URL |
+| `LOG_LEVEL` | No | `INFO` | Logging level |
+| `MAX_RETRIES` | No | `3` | Max retry attempts |
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 👥 Authors
+
+- Your Name - [GitHub](https://github.com/yourusername)
+
+## 🙏 Acknowledgments
+
+- CoinGecko API for free cryptocurrency data
+- CoinPaprika API for comprehensive crypto information
+- FastAPI framework for excellent developer experience
+
+---
+
+**Need Help?** Open an issue or contact: your.email@example.com
