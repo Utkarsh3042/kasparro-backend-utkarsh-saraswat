@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: crypto-etl-backend
+    env: docker
+    plan: free
+    region: oregon
+    envVars:
+      - key: COINPAPRIKA_API_KEY
+        sync: false
+      - key: COINPAPRIKA_API_URL
+        value: https://api.coinpaprika.com/v1
+      - key: COINGECKO_API_URL
+        value: https://api.coingecko.com/api/v3
+      - key: LOG_LEVEL
+        value: INFO
