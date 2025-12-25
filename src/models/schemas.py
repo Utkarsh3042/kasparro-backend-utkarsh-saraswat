@@ -3,8 +3,9 @@ from typing import Optional, List
 from datetime import datetime
 
 class CryptoData(BaseModel):
-    """Unified cryptocurrency data model"""
-    id: str
+    """Unified cryptocurrency data model with canonical ID"""
+    id: str  # Source-specific ID
+    canonical_id: Optional[str] = None  # Normalized canonical ID for deduplication
     symbol: str
     name: str
     current_price: Optional[float] = None
@@ -13,7 +14,20 @@ class CryptoData(BaseModel):
     price_change_24h: Optional[float] = None
     price_change_percentage_24h: Optional[float] = None
     last_updated: datetime
-    source: str
+    source: str  # 'csv', 'coingecko', or 'coinpaprika'
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "bitcoin",
+                "canonical_id": "btc",
+                "symbol": "BTC",
+                "name": "Bitcoin",
+                "current_price": 45000.0,
+                "market_cap": 900000000000.0,
+                "source": "coingecko"
+            }
+        }
 
 class CryptoResponse(BaseModel):
     """API response model"""
