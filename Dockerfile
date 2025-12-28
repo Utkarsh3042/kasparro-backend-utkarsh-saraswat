@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     postgresql-client \
     curl \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first (for layer caching)
@@ -36,11 +37,12 @@ RUN useradd -m -u 1000 appuser && \
     mkdir -p /app/data /app/logs && \
     chown -R appuser:appuser /app
 
-# Install runtime dependencies
+# Install runtime dependencies (including wget for health check)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     postgresql-client \
     curl \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python virtual environment from builder
@@ -69,9 +71,9 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+# Health check using wget (more reliable in slim images)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1
 
 # Default command with optimized workers
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
