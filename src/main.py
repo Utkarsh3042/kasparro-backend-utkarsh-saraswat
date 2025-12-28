@@ -86,7 +86,7 @@ async def startup_event():
         logger.error(f"❌ Database initialization failed: {e}")
     
     # Auto-ingest data on startup
-    await auto_ingest_on_startup()
+    auto_ingest_on_startup()  # Remove 'await'
 
 @app.on_event("shutdown")
 async def shutdown_event():
