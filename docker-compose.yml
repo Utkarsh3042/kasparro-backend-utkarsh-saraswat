@@ -1,54 +1,126 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database (Production)
   postgres:
     image: postgres:15-alpine
     container_name: crypto-etl-db
     environment:
-      POSTGRES_USER: crypto_user
-      POSTGRES_PASSWORD: crypto_pass
-      POSTGRES_DB: crypto_etl
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+      POSTGRES_USER: ${POSTGRES_USER:-crypto_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crypto_password}
+      POSTGRES_DB: ${POSTGRES_DB:-crypto_etl}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.utf8"
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U crypto_user -d crypto_etl"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crypto_user} -d ${POSTGRES_DB:-crypto_etl}"]
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     networks:
       - crypto-network
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # Backend API (FastAPI + SQLAlchemy ORM)
   backend:
     build: 
       context: .
       dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
     container_name: crypto-etl-backend
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: postgresql://crypto_user:crypto_pass@postgres:5432/crypto_etl
-      AUTO_INGEST_ON_STARTUP: "false"
-      AUTO_INGEST_SOURCES: "csv,coingecko,coinpaprika"
     depends_on:
       postgres:
         condition: service_healthy
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      # Database Configuration (PostgreSQL)
+      DATABASE_URL: postgresql://${POSTGRES_USER:-crypto_user}:${POSTGRES_PASSWORD:-crypto_password}@postgres:5432/${POSTGRES_DB:-crypto_etl}
+      
+      # API Configuration
+      COINGECKO_API_URL: https://api.coingecko.com/api/v3
+      COINPAPRIKA_API_URL: https://api.coinpaprika.com/v1
+      COINPAPRIKA_API_KEY: ${COINPAPRIKA_API_KEY:-}
+      
+      # Auto-Ingestion
+      AUTO_INGEST_ON_STARTUP: ${AUTO_INGEST_ON_STARTUP:-true}
+      AUTO_INGEST_SOURCES: ${AUTO_INGEST_SOURCES:-csv,coingecko,coinpaprika}
+      
+      # Rate Limiting
+      COINGECKO_MAX_CALLS_PER_MINUTE: ${COINGECKO_MAX_CALLS_PER_MINUTE:-50}
+      COINPAPRIKA_MAX_CALLS_PER_MINUTE: ${COINPAPRIKA_MAX_CALLS_PER_MINUTE:-25}
+      
+      # Retry & Circuit Breaker
+      MAX_RETRIES: ${MAX_RETRIES:-3}
+      BASE_RETRY_DELAY: ${BASE_RETRY_DELAY:-2.0}
+      CIRCUIT_BREAKER_THRESHOLD: ${CIRCUIT_BREAKER_THRESHOLD:-5}
+      CIRCUIT_BREAKER_TIMEOUT: ${CIRCUIT_BREAKER_TIMEOUT:-60}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
     volumes:
-      - ./data:/app/data
-      - ./src:/app/src
+      # Mount data directory for CSV files and SQLite (if used)
+      - ./data:/app/data:rw
+      - ./logs:/app/logs:rw
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     networks:
       - crypto-network
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # PgAdmin (Optional - Database Management UI)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: crypto-etl-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@crypto-etl.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      - postgres
+    networks:
+      - crypto-network
+    restart: unless-stopped
+    profiles:
+      - dev  # Only start with: docker-compose --profile dev up
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
 volumes:
   postgres_data:
+    driver: local
 
 networks:
   crypto-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
