@@ -28,11 +28,9 @@ app.add_middleware(
 app.include_router(router, prefix="/api/v1", tags=["crypto"])
 
 @app.get("/health")
+@app.head("/health")  # ✅ Add HEAD method support
 def health_check():
-    """
-    Comprehensive health check endpoint
-    Returns system status, data statistics, and enabled features
-    """
+    """Comprehensive health check endpoint"""
     try:
         data_count = storage.get_count()
         last_updated = storage.last_updated

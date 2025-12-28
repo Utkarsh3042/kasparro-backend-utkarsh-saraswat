@@ -29,18 +29,13 @@ class CryptoStorage:
     
     def store(self, data: List[CryptoData]) -> int:
         """
-        Store cryptocurrency data using ORM
-        
-        Args:
-            data: List of CryptoData objects
-            
-        Returns:
-            Number of records stored
+        Store cryptocurrency data using UPSERT logic (insert or update)
         """
         if not data:
             return 0
         
         stored_count = 0
+        updated_count = 0
         
         try:
             with get_db() as db:
@@ -52,7 +47,7 @@ class CryptoStorage:
                         ).first()
                         
                         if existing:
-                            # Update existing record
+                            # UPDATE existing record
                             existing.symbol = crypto.symbol
                             existing.name = crypto.name
                             existing.current_price = crypto.current_price
@@ -63,9 +58,10 @@ class CryptoStorage:
                             existing.last_updated = crypto.last_updated
                             existing.updated_at = datetime.now()
                             
+                            updated_count += 1
                             self.logger.debug(f"Updated: {crypto.symbol} ({crypto.id})")
                         else:
-                            # Insert new record
+                            # INSERT new record
                             new_crypto = Cryptocurrency(
                                 canonical_id=crypto.id,
                                 symbol=crypto.symbol,
@@ -78,24 +74,26 @@ class CryptoStorage:
                                 last_updated=crypto.last_updated
                             )
                             db.add(new_crypto)
+                            stored_count += 1
                             self.logger.debug(f"Inserted: {crypto.symbol} ({crypto.id})")
                         
                         # Store source mapping
                         self._store_source_mapping(db, crypto.id, crypto.source, crypto.id)
                         
-                        stored_count += 1
-                        
-                    except IntegrityError as e:
-                        self.logger.warning(f"Integrity error for {crypto.symbol}: {e}")
-                        db.rollback()
-                        continue
                     except Exception as e:
-                        self.logger.error(f"Error storing {crypto.symbol}: {e}")
-                        db.rollback()
+                        self.logger.error(f"Error processing {crypto.symbol}: {e}")
                         continue
                 
+                # Commit all changes at once
                 db.commit()
-                self.logger.info(f"✅ Stored {stored_count} records in database")
+                
+                total = stored_count + updated_count
+                self.logger.info(
+                    f"✅ Stored {total} records "
+                    f"({stored_count} new, {updated_count} updated)"
+                )
+                
+                return total
                 
         except Exception as e:
             self.logger.error(f"Storage operation failed: {e}")
