@@ -1,4 +1,4 @@
-version: '3.8'
+# Remove the 'version' line at the top
 
 services:
   # PostgreSQL Database (Production)
@@ -36,8 +36,6 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-      args:
-        - BUILDKIT_INLINE_CACHE=1
     container_name: crypto-etl-backend
     depends_on:
       postgres:
@@ -47,41 +45,21 @@ services:
     env_file:
       - .env
     environment:
-      # Database Configuration (PostgreSQL)
       DATABASE_URL: postgresql://${POSTGRES_USER:-crypto_user}:${POSTGRES_PASSWORD:-crypto_password}@postgres:5432/${POSTGRES_DB:-crypto_etl}
-      
-      # API Configuration
       COINGECKO_API_URL: https://api.coingecko.com/api/v3
       COINPAPRIKA_API_URL: https://api.coinpaprika.com/v1
-      COINPAPRIKA_API_KEY: ${COINPAPRIKA_API_KEY:-}
-      
-      # Auto-Ingestion
       AUTO_INGEST_ON_STARTUP: ${AUTO_INGEST_ON_STARTUP:-true}
       AUTO_INGEST_SOURCES: ${AUTO_INGEST_SOURCES:-csv,coingecko,coinpaprika}
-      
-      # Rate Limiting
-      COINGECKO_MAX_CALLS_PER_MINUTE: ${COINGECKO_MAX_CALLS_PER_MINUTE:-50}
-      COINPAPRIKA_MAX_CALLS_PER_MINUTE: ${COINPAPRIKA_MAX_CALLS_PER_MINUTE:-25}
-      
-      # Retry & Circuit Breaker
-      MAX_RETRIES: ${MAX_RETRIES:-3}
-      BASE_RETRY_DELAY: ${BASE_RETRY_DELAY:-2.0}
-      CIRCUIT_BREAKER_THRESHOLD: ${CIRCUIT_BREAKER_THRESHOLD:-5}
-      CIRCUIT_BREAKER_TIMEOUT: ${CIRCUIT_BREAKER_TIMEOUT:-60}
-      
-      # Logging
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      
     volumes:
-      # Mount data directory for CSV files and SQLite (if used)
       - ./data:/app/data:rw
       - ./logs:/app/logs:rw
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 90s  # Increased to give auto-ingest time to complete
     networks:
       - crypto-network
     restart: unless-stopped
@@ -107,7 +85,7 @@ services:
       - crypto-network
     restart: unless-stopped
     profiles:
-      - dev  # Only start with: docker-compose --profile dev up
+      - dev
     logging:
       driver: "json-file"
       options:

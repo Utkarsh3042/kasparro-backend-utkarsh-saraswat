@@ -19,9 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements first (for layer caching)
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --user --upgrade pip && \
-    pip install --no-cache-dir --user -r requirements.txt
+# Install Python dependencies to /opt/venv
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime
 FROM python:3.11-slim
@@ -41,8 +43,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Python dependencies from builder
-COPY --from=builder /root/.local /root/.local
+# Copy Python virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
 
 # Copy application code
 COPY --chown=appuser:appuser . .
@@ -50,11 +52,9 @@ COPY --chown=appuser:appuser . .
 # Ensure data directory exists with correct permissions
 RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
 
-# Make PATH include user-installed packages
-ENV PATH=/root/.local/bin:$PATH
-
-# Environment variables (can be overridden)
-ENV PYTHONUNBUFFERED=1 \
+# Set PATH to use virtual environment
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DATABASE_URL=sqlite:///./data/crypto_data.db \
     AUTO_INGEST_ON_STARTUP=true \
