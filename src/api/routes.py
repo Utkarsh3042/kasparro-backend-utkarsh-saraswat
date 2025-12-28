@@ -1,253 +1,412 @@
-from fastapi import APIRouter, Query, HTTPException
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Query, Request
+from typing import List, Optional
 from datetime import datetime
-from src.models.schemas import CryptoResponse, StatsResponse
+from src.models.schemas import (
+    CryptoData, IngestionResponse, StatsResponse,
+    PaginationParams, PaginationMeta
+)
+from src.ingestion.csv_source import CSVDataSource
 from src.ingestion.coingecko import CoinGeckoSource
 from src.ingestion.coinpaprika import CoinPaprikaSource
-from src.ingestion.csv_source import CSVDataSource
 from src.database.storage import storage
+from src.utils.normalizer import normalize_and_deduplicate
+from src.utils.pagination import create_pagination_meta, get_pagination_links
 from src.utils.logger import get_logger
 
-router = APIRouter()
 logger = get_logger(__name__)
+router = APIRouter()
 
-@router.post("/ingest/csv")
-def ingest_csv(limit: int = Query(100, ge=1, le=1000)):
-    """Ingest data from CSV file with normalization"""
+@router.post("/ingest/csv", response_model=IngestionResponse)
+async def ingest_csv(limit: int = Query(100, description="Maximum number of records to ingest")):
+    """
+    Ingest cryptocurrency data from CSV file
+    
+    - **limit**: Maximum number of records to fetch (default: 100)
+    """
     try:
         logger.info(f"Starting CSV ingestion (limit={limit})")
-        source = CSVDataSource()
-        records = source.fetch_coins(limit=limit)
         
-        if records:
-            storage.add_records(records, normalize=True)
-            logger.info(f"Successfully ingested {len(records)} records from CSV")
-            return {
-                "status": "success",
-                "message": f"Ingested {len(records)} records from CSV",
-                "count": len(records),
-                "normalized": True,
-                "total_unique_coins": storage.get_count()
-            }
-        else:
-            raise HTTPException(status_code=404, detail="No data found in CSV file")
-            
-    except FileNotFoundError:
-        logger.error("CSV file not found")
-        raise HTTPException(status_code=404, detail="CSV file not found. Please ensure data/crypto_data.csv exists")
+        # Fetch data from CSV
+        csv_source = CSVDataSource()
+        raw_data = csv_source.fetch_coins(limit=limit)
+        
+        if not raw_data:
+            logger.warning("No data fetched from CSV")
+            return IngestionResponse(
+                success=False,
+                message="No data available in CSV",
+                records_ingested=0,
+                source="csv",
+                timestamp=datetime.now()
+            )
+        
+        # Normalize and deduplicate
+        normalized_data = normalize_and_deduplicate(raw_data)
+        
+        # Store in database using ORM
+        stored_count = storage.store(normalized_data)  # ✅ Changed from add_records
+        
+        logger.info(f"Successfully ingested {stored_count} records from CSV")
+        
+        return IngestionResponse(
+            success=True,
+            message=f"Successfully ingested {stored_count} records from CSV",
+            records_ingested=stored_count,
+            source="csv",
+            timestamp=datetime.now()
+        )
         
     except Exception as e:
-        logger.error(f"CSV ingestion failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+        logger.error(f"CSV ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=f"CSV ingestion failed: {str(e)}")
 
-
-@router.post("/ingest/coingecko")
-def ingest_coingecko(limit: int = Query(100, ge=1, le=250)):
-    """Ingest data from CoinGecko API with normalization"""
+@router.post("/ingest/coingecko", response_model=IngestionResponse)
+async def ingest_coingecko(limit: int = Query(100, description="Maximum number of records to ingest")):
+    """
+    Ingest cryptocurrency data from CoinGecko API
+    
+    - **limit**: Maximum number of records to fetch (default: 100)
+    """
     try:
         logger.info(f"Starting CoinGecko ingestion (limit={limit})")
-        source = CoinGeckoSource()
-        records = source.fetch_coins(limit=limit)
         
-        if records:
-            storage.add_records(records, normalize=True)
-            logger.info(f"Successfully ingested {len(records)} records from CoinGecko")
-            return {
-                "status": "success",
-                "message": f"Ingested {len(records)} records from CoinGecko",
-                "count": len(records),
-                "normalized": True,
-                "total_unique_coins": storage.get_count()
-            }
-        else:
-            raise HTTPException(status_code=500, detail="Failed to fetch data from CoinGecko")
-            
+        # Fetch data from CoinGecko
+        coingecko_source = CoinGeckoSource()
+        raw_data = coingecko_source.fetch_coins(limit=limit)
+        
+        if not raw_data:
+            logger.warning("No data fetched from CoinGecko")
+            return IngestionResponse(
+                success=False,
+                message="No data available from CoinGecko",
+                records_ingested=0,
+                source="coingecko",
+                timestamp=datetime.now()
+            )
+        
+        # Normalize and deduplicate
+        normalized_data = normalize_and_deduplicate(raw_data)
+        
+        # Store in database using ORM
+        stored_count = storage.store(normalized_data)  # ✅ Changed from add_records
+        
+        logger.info(f"Successfully ingested {stored_count} records from CoinGecko")
+        
+        return IngestionResponse(
+            success=True,
+            message=f"Successfully ingested {stored_count} records from CoinGecko",
+            records_ingested=stored_count,
+            source="coingecko",
+            timestamp=datetime.now()
+        )
+        
     except Exception as e:
-        logger.error(f"CoinGecko ingestion failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+        logger.error(f"CoinGecko ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=f"CoinGecko ingestion failed: {str(e)}")
 
-
-@router.post("/ingest/coinpaprika")
-def ingest_coinpaprika(limit: int = Query(50, ge=1, le=100)):
-    """Ingest data from CoinPaprika API with normalization"""
+@router.post("/ingest/coinpaprika", response_model=IngestionResponse)
+async def ingest_coinpaprika(limit: int = Query(100, description="Maximum number of records to ingest")):
+    """
+    Ingest cryptocurrency data from CoinPaprika API
+    
+    - **limit**: Maximum number of records to fetch (default: 100)
+    """
     try:
         logger.info(f"Starting CoinPaprika ingestion (limit={limit})")
-        source = CoinPaprikaSource()
-        records = source.fetch_coins(limit=limit)
         
-        if records:
-            storage.add_records(records, normalize=True)
-            logger.info(f"Successfully ingested {len(records)} records from CoinPaprika")
-            return {
-                "status": "success",
-                "message": f"Ingested {len(records)} records from CoinPaprika",
-                "count": len(records),
-                "normalized": True,
-                "total_unique_coins": storage.get_count()
-            }
-        else:
-            raise HTTPException(status_code=500, detail="Failed to fetch data from CoinPaprika")
-            
+        # Fetch data from CoinPaprika
+        coinpaprika_source = CoinPaprikaSource()
+        raw_data = coinpaprika_source.fetch_coins(limit=limit)
+        
+        if not raw_data:
+            logger.warning("No data fetched from CoinPaprika")
+            return IngestionResponse(
+                success=False,
+                message="No data available from CoinPaprika",
+                records_ingested=0,
+                source="coinpaprika",
+                timestamp=datetime.now()
+            )
+        
+        # Normalize and deduplicate
+        normalized_data = normalize_and_deduplicate(raw_data)
+        
+        # Store in database using ORM
+        stored_count = storage.store(normalized_data)  # ✅ Changed from add_records
+        
+        logger.info(f"Successfully ingested {stored_count} records from CoinPaprika")
+        
+        return IngestionResponse(
+            success=True,
+            message=f"Successfully ingested {stored_count} records from CoinPaprika",
+            records_ingested=stored_count,
+            source="coinpaprika",
+            timestamp=datetime.now()
+        )
+        
     except Exception as e:
-        logger.error(f"CoinPaprika ingestion failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+        logger.error(f"CoinPaprika ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=f"CoinPaprika ingestion failed: {str(e)}")
 
-
-@router.post("/ingest/all")
-def ingest_all():
-    """Ingest data from all sources (CSV, CoinGecko, CoinPaprika) with normalization"""
-    logger.info("Starting ingestion from all sources")
+@router.post("/ingest/all", response_model=IngestionResponse)
+async def ingest_all(limit: int = Query(100, description="Maximum number of records per source")):
+    """
+    Ingest cryptocurrency data from all sources (CSV, CoinGecko, CoinPaprika)
     
-    results = {"csv": {}, "coingecko": {}, "coinpaprika": {}}
-    storage.clear()
-    
-    all_records = []
-    
-    # CSV Source
+    - **limit**: Maximum number of records to fetch per source (default: 100)
+    """
     try:
-        logger.info("Ingesting from CSV...")
-        csv_source = CSVDataSource()
-        csv_records = csv_source.fetch_coins(limit=100)
-        all_records.extend(csv_records)
-        results["csv"] = {"status": "success", "count": len(csv_records)}
-        logger.info(f"CSV: {len(csv_records)} records fetched")
+        logger.info(f"Starting multi-source ingestion (limit={limit} per source)")
+        
+        all_data = []
+        sources_used = []
+        
+        # Fetch from CSV
+        try:
+            csv_source = CSVDataSource()
+            csv_data = csv_source.fetch_coins(limit=limit)
+            if csv_data:
+                all_data.extend(csv_data)
+                sources_used.append("csv")
+                logger.info(f"Fetched {len(csv_data)} records from CSV")
+        except Exception as e:
+            logger.warning(f"CSV fetch failed: {e}")
+        
+        # Fetch from CoinGecko
+        try:
+            coingecko_source = CoinGeckoSource()
+            coingecko_data = coingecko_source.fetch_coins(limit=limit)
+            if coingecko_data:
+                all_data.extend(coingecko_data)
+                sources_used.append("coingecko")
+                logger.info(f"Fetched {len(coingecko_data)} records from CoinGecko")
+        except Exception as e:
+            logger.warning(f"CoinGecko fetch failed: {e}")
+        
+        # Fetch from CoinPaprika
+        try:
+            coinpaprika_source = CoinPaprikaSource()
+            coinpaprika_data = coinpaprika_source.fetch_coins(limit=limit)
+            if coinpaprika_data:
+                all_data.extend(coinpaprika_data)
+                sources_used.append("coinpaprika")
+                logger.info(f"Fetched {len(coinpaprika_data)} records from CoinPaprika")
+        except Exception as e:
+            logger.warning(f"CoinPaprika fetch failed: {e}")
+        
+        if not all_data:
+            logger.warning("No data fetched from any source")
+            return IngestionResponse(
+                success=False,
+                message="No data available from any source",
+                records_ingested=0,
+                source="all",
+                timestamp=datetime.now()
+            )
+        
+        # Normalize and deduplicate
+        normalized_data = normalize_and_deduplicate(all_data)
+        
+        # Store in database using ORM
+        stored_count = storage.store(normalized_data)  # ✅ Changed from add_records
+        
+        logger.info(f"Successfully ingested {stored_count} records from {len(sources_used)} sources")
+        
+        return IngestionResponse(
+            success=True,
+            message=f"Successfully ingested {stored_count} records from sources: {', '.join(sources_used)}",
+            records_ingested=stored_count,
+            source="all",
+            timestamp=datetime.now()
+        )
+        
     except Exception as e:
-        logger.error(f"CSV ingestion failed: {str(e)}")
-        results["csv"] = {"status": "failed", "error": str(e)}
-    
-    # CoinGecko Source
-    try:
-        logger.info("Ingesting from CoinGecko...")
-        cg_source = CoinGeckoSource()
-        cg_records = cg_source.fetch_coins(limit=100)
-        all_records.extend(cg_records)
-        results["coingecko"] = {"status": "success", "count": len(cg_records)}
-        logger.info(f"CoinGecko: {len(cg_records)} records fetched")
-    except Exception as e:
-        logger.error(f"CoinGecko ingestion failed: {str(e)}")
-        results["coingecko"] = {"status": "failed", "error": str(e)}
-    
-    # CoinPaprika Source
-    try:
-        logger.info("Ingesting from CoinPaprika...")
-        cp_source = CoinPaprikaSource()
-        cp_records = cp_source.fetch_coins(limit=50)
-        all_records.extend(cp_records)
-        results["coinpaprika"] = {"status": "success", "count": len(cp_records)}
-        logger.info(f"CoinPaprika: {len(cp_records)} records fetched")
-    except Exception as e:
-        logger.error(f"CoinPaprika ingestion failed: {str(e)}")
-        results["coinpaprika"] = {"status": "failed", "error": str(e)}
-    
-    # Add all records with normalization and deduplication
-    if all_records:
-        storage.add_records(all_records, normalize=True)
-        logger.info(f"Total records after normalization: {storage.get_count()}")
-    
-    return {
-        "status": "completed",
-        "sources": results,
-        "total_fetched": len(all_records),
-        "total_unique_coins": storage.get_count(),
-        "normalized": True,
-        "deduplicated": True
-    }
+        logger.error(f"Multi-source ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Multi-source ingestion failed: {str(e)}")
 
-
-@router.get("/data", response_model=CryptoResponse)
-def get_data(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
-    source: Optional[str] = None,
-    symbol: Optional[str] = None
+@router.get("/data")
+async def get_all_data(
+    request: Request,
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    page_size: int = Query(100, ge=1, le=1000, description="Items per page (max: 1000)")
 ):
     """
-    Retrieve cryptocurrency data with pagination and filtering
+    Get all cryptocurrency data with pagination
     
-    - **page**: Page number (default: 1)
-    - **page_size**: Items per page (default: 10, max: 100)
-    - **source**: Filter by source (csv, coingecko, coinpaprika)
-    - **symbol**: Filter by symbol (e.g., BTC, ETH)
+    - **page**: Page number (starts from 1)
+    - **page_size**: Number of items per page (max: 1000)
+    
+    Returns paginated results with metadata
     """
-    all_data = storage.get_all()
-    
-    # Apply filters
-    if source:
-        all_data = [d for d in all_data if d.source == source.lower()]
-    
-    if symbol:
-        all_data = [d for d in all_data if d.symbol.upper() == symbol.upper()]
-    
-    # Pagination
-    start = (page - 1) * page_size
-    end = start + page_size
-    paginated_data = all_data[start:end]
-    
-    return CryptoResponse(
-        total=len(all_data),
-        page=page,
-        page_size=page_size,
-        data=paginated_data
-    )
+    try:
+        # Get paginated data from storage
+        data, total_count = storage.get_all(page=page, page_size=page_size)
+        
+        # Create pagination metadata
+        pagination_meta = create_pagination_meta(page, page_size, total_count)
+        
+        # Create pagination links
+        base_url = str(request.url).split('?')[0]
+        links = get_pagination_links(base_url, page, page_size, pagination_meta.total_pages)
+        
+        return {
+            "data": data,
+            "pagination": pagination_meta.dict(),
+            "links": links
+        }
+    except Exception as e:
+        logger.error(f"Error fetching data: {e}")
+        raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
 
 
-@router.get("/stats", response_model=StatsResponse)
-def get_stats():
+@router.get("/search")
+async def search_coins(
+    request: Request,
+    symbol: Optional[str] = Query(None, description="Search by symbol"),
+    min_price: Optional[float] = Query(None, description="Minimum price"),
+    max_price: Optional[float] = Query(None, description="Maximum price"),
+    source: Optional[str] = Query(None, description="Filter by source"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(100, ge=1, le=1000, description="Items per page")
+):
     """
-    Get comprehensive statistics about cryptocurrency data
+    Search and filter cryptocurrencies with pagination
+    
+    - **symbol**: Filter by symbol (case-insensitive, partial match)
+    - **min_price**: Minimum current price
+    - **max_price**: Maximum current price
+    - **source**: Filter by data source (csv, coingecko, coinpaprika)
+    - **page**: Page number (starts from 1)
+    - **page_size**: Items per page (max: 1000)
+    """
+    try:
+        # Get filtered and paginated results
+        results, total_count = storage.filter(
+            symbol=symbol,
+            min_price=min_price,
+            max_price=max_price,
+            source=source,
+            page=page,
+            page_size=page_size
+        )
+        
+        # Create pagination metadata
+        pagination_meta = create_pagination_meta(page, page_size, total_count)
+        
+        # Create pagination links
+        base_url = str(request.url).split('?')[0]
+        links = get_pagination_links(base_url, page, page_size, pagination_meta.total_pages)
+        
+        return {
+            "data": results,
+            "pagination": pagination_meta.dict(),
+            "links": links,
+            "filters": {
+                "symbol": symbol,
+                "min_price": min_price,
+                "max_price": max_price,
+                "source": source
+            }
+        }
+    except Exception as e:
+        logger.error(f"Search failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+@router.get("/coins/{coin_id}")
+async def get_coin_by_id(coin_id: str):
+    """
+    Get cryptocurrency by canonical ID
+    
+    - **coin_id**: Canonical identifier (e.g., 'btc', 'bitcoin')
+    
+    No pagination needed - returns single item
+    """
+    try:
+        coin = storage.get_by_canonical_id(coin_id.lower())
+        if not coin:
+            raise HTTPException(status_code=404, detail=f"Coin '{coin_id}' not found")
+        return coin
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching coin {coin_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error fetching coin: {str(e)}")
+
+
+@router.get("/stats")
+async def get_statistics():
+    """
+    Get database statistics and analytics
+    
+    No pagination needed - returns summary data
     
     Returns:
-    - Total coins count
-    - Total market capitalization
-    - Total trading volume
+    - Total number of cryptocurrencies
     - Average price
-    - Top 5 gainers (24h)
-    - Top 5 losers (24h)
+    - Total market cap
+    - Top 5 by market cap
+    - Source distribution
     """
-    all_data = storage.get_all()
-    
-    if not all_data:
-        raise HTTPException(status_code=404, detail="No data available. Please ingest data first.")
-    
-    # Calculate aggregates
-    valid_market_cap = [d.market_cap for d in all_data if d.market_cap]
-    valid_volume = [d.total_volume for d in all_data if d.total_volume]
-    valid_price = [d.current_price for d in all_data if d.current_price]
-    
-    # Sort by 24h change
-    coins_with_change = [d for d in all_data if d.price_change_percentage_24h is not None]
-    sorted_by_change = sorted(coins_with_change, key=lambda x: x.price_change_percentage_24h or 0, reverse=True)
-    
-    return StatsResponse(
-        total_coins=len(all_data),
-        total_market_cap=sum(valid_market_cap) if valid_market_cap else 0.0,
-        total_volume=sum(valid_volume) if valid_volume else 0.0,
-        avg_price=sum(valid_price) / len(valid_price) if valid_price else 0.0,
-        top_gainers=sorted_by_change[:5],
-        top_losers=sorted_by_change[-5:][::-1] if len(sorted_by_change) >= 5 else []
-    )
+    try:
+        stats = storage.get_statistics()
+        return stats
+    except Exception as e:
+        logger.error(f"Error fetching statistics: {e}")
+        raise HTTPException(status_code=500, detail=f"Error fetching statistics: {str(e)}")
 
 
-@router.get("/coins/{canonical_id}")
-def get_coin_by_id(canonical_id: str):
-    """Get specific coin by canonical ID"""
-    coin = storage.get_by_canonical_id(canonical_id.lower())
+@router.delete("/data/clear")
+async def clear_all_data():
+    """
+    Clear all data from database (use with caution!)
     
-    if not coin:
-        raise HTTPException(status_code=404, detail=f"Coin with canonical_id '{canonical_id}' not found")
-    
-    return coin
+    No pagination needed - returns status only
+    """
+    try:
+        storage.clear()
+        logger.info("Database cleared successfully")
+        return {
+            "success": True,
+            "message": "All data cleared from database",
+            "timestamp": datetime.now()
+        }
+    except Exception as e:
+        logger.error(f"Error clearing database: {e}")
+        raise HTTPException(status_code=500, detail=f"Error clearing database: {str(e)}")
 
+# Add this endpoint to monitor rate limiters and circuit breakers
 
-@router.delete("/data")
-def clear_data():
-    """Clear all stored cryptocurrency data"""
-    count = storage.get_count()
-    storage.clear()
-    logger.info(f"Cleared {count} records from storage")
+@router.get("/status/api-health")
+async def get_api_health():
+    """
+    Get health status of external APIs
     
-    return {
-        "status": "success",
-        "message": f"Cleared {count} records",
-        "total_records": 0
-    }
+    Returns:
+    - Rate limiter statistics
+    - Circuit breaker states
+    - API availability
+    """
+    from src.ingestion.coingecko import CoinGeckoSource
+    from src.ingestion.coinpaprika import CoinPaprikaSource
+    
+    try:
+        coingecko = CoinGeckoSource()
+        coinpaprika = CoinPaprikaSource()
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "apis": {
+                "coingecko": {
+                    "rate_limiter": coingecko.get_rate_limit_stats(),
+                    "circuit_breaker": coingecko.get_circuit_breaker_state()
+                },
+                "coinpaprika": {
+                    "rate_limiter": coinpaprika.get_rate_limit_stats(),
+                    "circuit_breaker": coinpaprika.get_circuit_breaker_state()
+                }
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error fetching API health: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -1,21 +1,33 @@
 # Crypto ETL Backend System 🚀
 
-A production-ready cryptocurrency data aggregation and ETL (Extract, Transform, Load) system built with **FastAPI**, **Docker**, **PostgreSQL**, and **multi-source data ingestion** (CSV, CoinGecko API, CoinPaprika API).
+A production-ready cryptocurrency data aggregation and ETL (Extract, Transform, Load) system built with **FastAPI**, **SQLAlchemy ORM**, **Docker**, **PostgreSQL/SQLite**, and **multi-source data ingestion** (CSV, CoinGecko API, CoinPaprika API).
 
 **Assignment Submission for Kasparov Backend & ETL Systems**  
-**Date:** December 26, 2025  
+**Date:** December 28, 2025  
 **Version:** 2.0.0
 
 ## 🌟 Key Achievements
 
+### Core Features
+- ✅ **SQLAlchemy ORM** - Full ORM implementation with PostgreSQL/SQLite support
 - ✅ **3 Data Sources** - CSV files, CoinGecko API, CoinPaprika API
 - ✅ **Data Normalization** - Canonical ID strategy with intelligent deduplication
-- ✅ **Multi-stage Dockerfile** - Optimized production build
-- ✅ **PostgreSQL Integration** - Schema initialization and persistence
+- ✅ **Pagination** - Page-based pagination on all list endpoints
 - ✅ **Auto-Start ETL** - Automatic data ingestion on container launch
-- ✅ **Comprehensive API** - 9 REST endpoints with OpenAPI documentation
-- ✅ **Robust Error Handling** - Retry logic with exponential backoff
-- ✅ **Production Ready** - Docker Compose orchestration, health checks, logging
+- ✅ **Comprehensive API** - 12+ REST endpoints with OpenAPI documentation
+
+### Resilience & Performance
+- ✅ **Rate Limiting** - Adaptive rate limiting (50/min CoinGecko, 25/min CoinPaprika)
+- ✅ **Circuit Breaker** - Prevents cascading failures (5 failure threshold)
+- ✅ **Retry Logic** - Exponential backoff with jitter (up to 3 retries)
+- ✅ **Robust Error Handling** - Multi-layer validation with detailed logging
+- ✅ **CSV Validation** - Strict/lenient modes with edge case handling
+
+### Production Ready
+- ✅ **Multi-stage Dockerfile** - Optimized production build
+- ✅ **Docker Compose** - Full orchestration with PostgreSQL
+- ✅ **Health Checks** - API health monitoring endpoints
+- ✅ **Comprehensive Logging** - Structured logging with context
 
 ## 🏗️ Architecture
 
@@ -42,12 +54,14 @@ A production-ready cryptocurrency data aggregation and ETL (Extract, Transform, 
    ▼   ▼   ▼
 ┌──────────────────────────────────────────────────────┐
 │              Data Storage Layer                       │
-│    PostgreSQL DB + In-Memory Cache (Singleton)       │
+│    SQLAlchemy ORM + PostgreSQL/SQLite                │
+│    (CRUD, Pagination, Relationships)                 │
 └──────────────────────────────────────────────────────┘
         │
         ▼
 ┌──────────────────────────────────────────────────────┐
 │           External Data Sources                       │
+│    (Rate Limited, Retry Logic, Circuit Breakers)     │
 │   CSV Files  │  CoinGecko API  │  CoinPaprika API    │
 └──────────────────────────────────────────────────────┘
 ```
@@ -65,30 +79,35 @@ A production-ready cryptocurrency data aggregation and ETL (Extract, Transform, 
 ## 🚀 Features
 
 ### **P0 - Foundation Layer** ✅
-- ✅ **CSV Data Source**: Ingest cryptocurrency data from CSV files (required for Module 0.1)
+- ✅ **CSV Data Source**: Robust CSV ingestion with multi-layer validation
 - ✅ **Multi-Source Ingestion**: CoinGecko API + CoinPaprika API + CSV files
-- ✅ **RESTful API**: 9 endpoints with automatic OpenAPI documentation at `/docs`
-- ✅ **Multi-Stage Dockerfile**: Optimized production build (required for Module 0.3)
-- ✅ **PostgreSQL Integration**: Database schema with initialization scripts
-- ✅ **Auto-Start ETL**: Configurable automatic data ingestion on startup (Module 0.4)
-- ✅ **Health Monitoring**: `/health` endpoint for service status
+- ✅ **RESTful API**: 12+ endpoints with automatic OpenAPI documentation at `/docs`
+- ✅ **SQLAlchemy ORM**: Full ORM implementation with PostgreSQL/SQLite support
+- ✅ **Multi-Stage Dockerfile**: Optimized production build
+- ✅ **PostgreSQL Integration**: ORM-managed schema with relationships and indexes
+- ✅ **Auto-Start ETL**: Configurable automatic data ingestion on startup
+- ✅ **Health Monitoring**: `/health` and `/status/api-health` endpoints
 - ✅ **Comprehensive Testing**: Unit and integration tests with pytest
 
 ### **P1 - Growth Layer** ✅
-- ✅ **Data Normalization**: Canonical ID strategy with symbol mapping (Module 2)
+- ✅ **Data Normalization**: Canonical ID strategy with symbol mapping
 - ✅ **Intelligent Deduplication**: Priority-based deduplication across sources
+- ✅ **Pagination**: Page-based pagination with metadata (page, page_size, total, has_next)
 - ✅ **Statistical Analysis**: Market cap stats, top gainers/losers (`/stats`)
-- ✅ **Advanced Filtering**: Filter by source, symbol, canonical ID
-- ✅ **Clean Architecture**: Separation of concerns (ingestion, normalization, storage, API)
-- ✅ **Comprehensive Error Handling**: Retry logic with exponential backoff
+- ✅ **Advanced Filtering**: Filter by source, symbol, price range with pagination
+- ✅ **Clean Architecture**: Separation of concerns (ingestion, normalization, ORM, API)
+- ✅ **CSV Validation**: Strict/lenient modes with comprehensive error detection
 
 ### **P2 - Differentiation Layer** ✅
-- ✅ **Rate Limiting & Backoff**: Exponential backoff for API failures (3 retries, 2s base delay)
-- ✅ **Observability**: Structured logging with timestamps and log levels
-- ✅ **Failure Recovery**: Graceful degradation when CoinGecko rate limits exceeded
+- ✅ **Adaptive Rate Limiting**: Self-adjusting rate limits (50/min CoinGecko, 25/min CoinPaprika)
+- ✅ **Circuit Breaker Pattern**: Prevents cascading failures (5 failure threshold, 60s timeout)
+- ✅ **Exponential Backoff**: Smart retry with jitter (up to 3 retries, 2-60s delay)
+- ✅ **Observability**: Structured logging with timestamps, context, and log levels
+- ✅ **Failure Recovery**: Graceful degradation when APIs fail or rate limits exceeded
 - ✅ **Configuration Management**: Environment-based settings with .env file
 - ✅ **Docker Compose Orchestration**: One-command multi-container setup
 - ✅ **Volume Persistence**: PostgreSQL data persistence and development hot-reload
+- ✅ **API Health Monitoring**: Real-time rate limiter and circuit breaker status
 
 ## 📁 Project Structure
 
@@ -97,28 +116,32 @@ backend-etl-system/
 ├── src/
 │   ├── __init__.py
 │   ├── main.py                    # FastAPI application entry point
-│   ├── config.py                  # Configuration management
+│   ├── config.py                  # Configuration management with Pydantic v2
 │   ├── startup.py                 # Auto-ingest on container startup
 │   ├── api/
 │   │   ├── __init__.py
-│   │   └── routes.py              # API endpoint definitions (9 endpoints)
+│   │   └── routes.py              # API endpoint definitions (12+ endpoints)
 │   ├── ingestion/
 │   │   ├── __init__.py
 │   │   ├── base.py                # Base ingestion class
-│   │   ├── coingecko.py           # CoinGecko API integration
-│   │   ├── coinpaprika.py         # CoinPaprika API integration
-│   │   └── csv_source.py          # CSV file ingestion
+│   │   ├── coingecko.py           # CoinGecko API (rate limited, retry, circuit breaker)
+│   │   ├── coinpaprika.py         # CoinPaprika API (rate limited, retry, circuit breaker)
+│   │   └── csv_source.py          # CSV file ingestion with robust error handling
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── schemas.py             # Pydantic data models (with canonical_id)
+│   │   └── schemas.py             # Pydantic data models (CryptoData, pagination, etc.)
 │   ├── database/
 │   │   ├── __init__.py
-│   │   └── storage.py             # Data storage with normalization
+│   │   ├── models.py              # SQLAlchemy ORM models (Cryptocurrency, SourceMapping)
+│   │   ├── connection.py          # Database connection and session management
+│   │   └── storage.py             # ORM-based storage layer with CRUD operations
 │   └── utils/
 │       ├── __init__.py
 │       ├── logger.py              # Logging configuration
 │       ├── normalizer.py          # Data normalization & deduplication
-│       └── retry.py               # Retry logic utilities
+│       ├── retry.py               # Retry logic with exponential backoff & circuit breaker
+│       ├── rate_limiter.py        # Adaptive rate limiting with token bucket
+│       └── pagination.py          # Pagination utilities and metadata
 ├── scripts/
 │   └── generate_sample_csv.py     # Generate sample cryptocurrency CSV
 ├── data/
@@ -262,66 +285,93 @@ AUTO_INGEST_SOURCES=csv,coingecko,coinpaprika
 
 ## 📖 API Endpoints
 
-The system provides 9 RESTful API endpoints. See [TESTING.md](TESTING.md) for comprehensive testing examples.
+The system provides 12+ RESTful API endpoints with pagination, filtering, and monitoring. See [TESTING.md](TESTING.md) for comprehensive testing examples.
 
 ### **Core Endpoints**
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/health` | Service health check with metrics |
-| POST | `/api/v1/ingest/csv` | Ingest from CSV file |
-| POST | `/api/v1/ingest/coingecko` | Ingest from CoinGecko API |
-| POST | `/api/v1/ingest/coinpaprika` | Ingest from CoinPaprika API |
-| POST | `/api/v1/ingest/all` | Ingest from all 3 sources |
-| GET | `/api/v1/data` | Retrieve all data with filtering |
-| GET | `/api/v1/stats` | Market statistics |
+| GET | `/health` | Service health check with metrics and database status |
+| GET | `/status/api-health` | External API health (rate limiters, circuit breakers) |
+| POST | `/api/v1/ingest/csv` | Ingest from CSV file with validation |
+| POST | `/api/v1/ingest/coingecko` | Ingest from CoinGecko API (rate limited) |
+| POST | `/api/v1/ingest/coinpaprika` | Ingest from CoinPaprika API (rate limited) |
+| POST | `/api/v1/ingest/all` | Ingest from all 3 sources with retry logic |
+| GET | `/api/v1/data` | Retrieve all data with **pagination** |
+| GET | `/api/v1/search` | Search and filter with **pagination** |
+| GET | `/api/v1/stats` | Market statistics and aggregations |
+| GET | `/api/v1/coins/{id}` | Get cryptocurrency by canonical ID |
+| DELETE | `/api/v1/data/clear` | Clear all data from database |
 | GET | `/api/v1/coins/{canonical_id}` | Get coin by canonical ID |
 | DELETE | `/api/v1/data` | Clear all data |
 
 ### **Quick Examples**
 
-#### **1. CSV Ingestion**
+#### **1. CSV Ingestion with Pagination**
 ```bash
-# Ingest from data/crypto_data.csv
-curl -X POST "http://localhost:8000/api/v1/ingest/csv"
+# Ingest from data/crypto_data.csv with limit
+curl -X POST "http://localhost:8000/api/v1/ingest/csv?limit=100"
 
 # Response:
 {
+  "success": true,
+  "message": "Successfully ingested 23 records from CSV",
+  "records_ingested": 23,
   "source": "csv",
-  "count": 5,
-  "status": "success",
-  "coins_fetched": ["bitcoin", "ethereum", "cardano", "solana", "polkadot"]
+  "timestamp": "2025-12-28T17:00:00Z"
 }
 ```
 
 #### **2. Multi-Source Ingestion with Normalization**
 ```bash
-# Ingest from all 3 sources
-curl -X POST "http://localhost:8000/api/v1/ingest/all?coingecko_limit=100&coinpaprika_limit=50"
+# Ingest from all 3 sources with rate limiting
+curl -X POST "http://localhost:8000/api/v1/ingest/all?limit=100"
 
 # Response shows deduplication:
 {
-  "sources": {
-    "csv": {"count": 5, "status": "success"},
-    "coingecko": {"count": 100, "status": "success"},
-    "coinpaprika": {"count": 50, "status": "success"}
-  },
-  "total_fetched": 155,
-  "total_stored": 120,  # Duplicates removed
-  "duplicates_removed": 35
+  "success": true,
+  "message": "Successfully ingested 120 records from sources: csv, coingecko, coinpaprika",
+  "records_ingested": 120,
+  "source": "all",
+  "timestamp": "2025-12-28T17:00:00Z"
 }
 ```
 
-#### **3. Retrieve Data with Filtering**
+#### **3. Retrieve Data with Pagination**
 ```bash
 # Get all data (paginated)
 curl "http://localhost:8000/api/v1/data?page=1&page_size=20"
 
-# Filter by source
-curl "http://localhost:8000/api/v1/data?source=coingecko"
+# Response with pagination metadata:
+{
+  "data": [
+    {
+      "canonical_id": "btc",
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "current_price": 45000.0,
+      "market_cap": 900000000000.0,
+      ...
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "page_size": 20,
+    "total_items": 150,
+    "total_pages": 8,
+    "has_next": true,
+    "has_previous": false
+  },
+  "links": {
+    "self": "http://localhost:8000/api/v1/data?page=1&page_size=20",
+    "next": "http://localhost:8000/api/v1/data?page=2&page_size=20",
+    "first": "http://localhost:8000/api/v1/data?page=1&page_size=20",
+    "last": "http://localhost:8000/api/v1/data?page=8&page_size=20"
+  }
+}
 
-# Filter by symbol
-curl "http://localhost:8000/api/v1/data?symbol=BTC"
+# Search with filters and pagination
+curl "http://localhost:8000/api/v1/search?symbol=BTC&min_price=100&page=1&page_size=10"
 
 # Get by canonical ID
 curl "http://localhost:8000/api/v1/coins/btc"
@@ -333,15 +383,60 @@ curl "http://localhost:8000/api/v1/stats"
 
 # Response:
 {
-  "total_coins": 120,
-  "total_market_cap": 2451678934567.89,
+  "total_cryptocurrencies": 120,
   "average_price": 18234.56,
-  "top_gainers": [
-    {"symbol": "SOL", "price_change_24h": 15.67, "name": "Solana"}
+  "total_market_cap": 2451678934567.89,
+  "top_by_market_cap": [
+    {
+      "canonical_id": "btc",
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "market_cap": 900000000000.0
+    }
   ],
-  "top_losers": [
-    {"symbol": "ADA", "price_change_24h": -8.34, "name": "Cardano"}
-  ]
+  "sources": {
+    "csv": 23,
+    "coingecko": 100,
+    "coinpaprika": 50
+  }
+}
+```
+
+#### **5. API Health Monitoring**
+```bash
+# Check API health and rate limiters
+curl "http://localhost:8000/status/api-health"
+
+# Response:
+{
+  "timestamp": "2025-12-28T17:00:00Z",
+  "apis": {
+    "coingecko": {
+      "rate_limiter": {
+        "name": "CoinGecko",
+        "current_calls": 25,
+        "max_calls": 50,
+        "available_calls": 25,
+        "percentage_used": 50.0
+      },
+      "circuit_breaker": {
+        "name": "CoinGecko",
+        "state": "CLOSED",
+        "failure_count": 0
+      }
+    },
+    "coinpaprika": {
+      "rate_limiter": {
+        "name": "CoinPaprika",
+        "current_calls": 10,
+        "max_calls": 25,
+        "available_calls": 15
+      },
+      "circuit_breaker": {
+        "state": "CLOSED"
+      }
+    }
+  }
 }
 ```
 

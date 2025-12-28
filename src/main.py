@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from src.api.routes import router
 from src.database.storage import storage
+from src.database.connection import init_db  # Add this
 from src.utils.logger import get_logger
 from src.startup import auto_ingest_on_startup
 
@@ -10,7 +11,7 @@ logger = get_logger(__name__)
 
 app = FastAPI(
     title="Crypto ETL Backend System",
-    description="Production-ready ETL system with CSV, CoinGecko, and CoinPaprika data sources. Features normalization, deduplication, and auto-ingestion.",
+    description="Production-ready ETL system with CSV, CoinGecko, and CoinPaprika data sources. Features normalization, deduplication, auto-ingestion, and ORM with PostgreSQL.",
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -41,7 +42,8 @@ def health_check():
             "message": "Crypto ETL Backend is running",
             "version": "2.0.0",
             "timestamp": datetime.now().isoformat(),
-            "data": {
+            "database": {
+                "connected": True,
                 "total_records": data_count,
                 "last_updated": last_updated.isoformat() if last_updated else None
             },
@@ -51,7 +53,9 @@ def health_check():
                 "normalization": True,
                 "deduplication": True,
                 "auto_ingest": True,
-                "multi_source": True
+                "multi_source": True,
+                "orm": True,
+                "postgresql": True
             },
             "sources": ["csv", "coingecko", "coinpaprika"]
         }
@@ -69,9 +73,17 @@ async def startup_event():
     logger.info("=" * 70)
     logger.info("🚀 Crypto ETL Backend System Starting...")
     logger.info("📦 Version: 2.0.0")
-    logger.info("✨ Features: CSV + API Ingestion, Normalization, Auto-Start ETL")
+    logger.info("✨ Features: CSV + API Ingestion, Normalization, Auto-Start ETL, ORM")
     logger.info("🔗 Sources: CSV, CoinGecko, CoinPaprika")
+    logger.info("🗄️  Database: PostgreSQL with SQLAlchemy ORM")
     logger.info("=" * 70)
+    
+    # Initialize database
+    try:
+        init_db()
+        logger.info("✅ Database initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Database initialization failed: {e}")
     
     # Auto-ingest data on startup
     await auto_ingest_on_startup()
@@ -83,4 +95,4 @@ async def shutdown_event():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
