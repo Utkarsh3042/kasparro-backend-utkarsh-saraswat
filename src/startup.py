@@ -1,8 +1,6 @@
 import os
 from src.utils.logger import get_logger
 from src.database.storage import storage
-from src.ingestion.normalizer import normalize_data
-from src.ingestion.deduplication import deduplicate_data
 
 logger = get_logger(__name__)
 
@@ -54,13 +52,11 @@ def auto_ingest_on_startup():
         except Exception as e:
             logger.error(f"❌ CoinPaprika auto-ingest failed: {e}")
     
-    # Normalize, deduplicate, and store
+    # Store records (storage.store() handles deduplication internally)
     if all_records:
         try:
-            normalized = normalize_data(all_records)
-            deduplicated = deduplicate_data(normalized)
-            stored = storage.store(deduplicated)
-            logger.info(f"✅ Auto-ingested {stored} records on startup (from {len(all_records)} total)")
+            stored = storage.store(all_records)
+            logger.info(f"✅ Auto-ingested {stored} records on startup")
         except Exception as e:
             logger.error(f"❌ Failed to store records: {e}")
     else:
